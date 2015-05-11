@@ -116,24 +116,6 @@ static ident_t upcase_name(const char * name)
    return i;
 }
 
-static void lib_unlock(lib_t lib)
-{
-   if (flock(lib->lock_fd, LOCK_UN) < 0)
-      fatal_errno("flock");
-}
-
-static void lib_read_lock(lib_t lib)
-{
-   if (flock(lib->lock_fd, LOCK_SH) < 0)
-      fatal_errno("flock");
-}
-
-static void lib_write_lock(lib_t lib)
-{
-   if (flock(lib->lock_fd, LOCK_EX) < 0)
-      fatal_errno("flock");
-}
-
 static lib_t lib_init(const char *name, const char *rpath, int lock_fd)
 {
    struct lib *l = xmalloc(sizeof(struct lib));
@@ -156,7 +138,7 @@ static lib_t lib_init(const char *name, const char *rpath, int lock_fd)
       if ((l->lock_fd = open(lock_path, O_RDONLY)) < 0)
          fatal_errno("lib_init: %s", lock_path);
 
-      lib_read_lock(l);
+      file_read_lock(l->lock_fd);
    }
 
    fbuf_t *f = lib_fbuf_open(l, "_index", FBUF_IN);
@@ -181,7 +163,7 @@ static lib_t lib_init(const char *name, const char *rpath, int lock_fd)
       fbuf_close(f);
    }
 
-   lib_unlock(l);
+   file_unlock(l->lock_fd);
    return l;
 }
 
@@ -303,24 +285,21 @@ lib_t lib_new(const char *name, const char *path)
          fatal("invalid character '%c' in library name", *p);
    }
 
-   struct stat buf;
-   if (stat(path, &buf) == 0) {
-      if (!S_ISDIR(buf.st_mode))
-         fatal("path %s already exists and is not a directory", path);
-   }
-
    char *lockf LOCAL = xasprintf("%s/%s", path, "_NVC_LIB");
 
-   if (mkdir(path, 0777) != 0) {
-      if (errno == EEXIST) {
+   struct stat buf;
+   if (stat(path, &buf) == 0) {
+      if (S_ISDIR(buf.st_mode)) {
          struct stat sb;
          if (stat(lockf, &sb) != 0 && !opt_get_int("force-init"))
             fatal("directory %s already exists and is not an NVC library "
                   "(use --force-init to override this check)", path);
       }
       else
-         fatal_errno("mkdir: %s", path);
+         fatal("path %s already exists and is not a directory", path);
    }
+
+   make_dir(path);
 
    int fd = open(lockf, O_CREAT | O_EXCL | O_RDWR, 0777);
    if (fd < 0) {
@@ -328,8 +307,7 @@ lib_t lib_new(const char *name, const char *path)
          fatal_errno("lib_new: %s", lockf);
    }
    else {
-      if (flock(fd, LOCK_EX) < 0)
-         fatal_errno("flock");
+      file_write_lock(fd);
 
       const char *marker = PACKAGE_STRING "\n";
       if (write(fd, marker, strlen(marker)) < 0)
@@ -592,7 +570,7 @@ static lib_unit_t *lib_get_aux(lib_t lib, ident_t ident)
    if (*(lib->path) == '\0')   // Temporary library
       return NULL;
 
-   lib_read_lock(lib);
+   file_read_lock(lib->lock_fd);
 
    // Otherwise search in the filesystem
    DIR *d = opendir(lib->path);
@@ -621,7 +599,7 @@ static lib_unit_t *lib_get_aux(lib_t lib, ident_t ident)
    }
 
    closedir(d);
-   lib_unlock(lib);
+   file_unlock(lib->lock_fd);
 
    if (unit == NULL && lib_find_in_index(lib, ident) != NULL)
       fatal("library %s corrupt: unit %s present in index but missing "
@@ -711,7 +689,7 @@ void lib_save(lib_t lib)
 {
    assert(lib != NULL);
 
-   lib_write_lock(lib);
+   file_write_lock(lib->lock_fd);
 
    for (unsigned n = 0; n < lib->n_units; n++) {
       if (lib->units[n].dirty) {
@@ -747,7 +725,7 @@ void lib_save(lib_t lib)
 
    ident_write_end(ictx);
    fbuf_close(f);
-   lib_unlock(lib);
+   file_unlock(lib->lock_fd);
 }
 
 void lib_walk_index(lib_t lib, lib_index_fn_t fn, void *context)
@@ -782,7 +760,5 @@ void lib_realpath(lib_t lib, const char *name, char *buf, size_t buflen)
 
 void lib_mkdir(lib_t lib, const char *name)
 {
-   if ((mkdir(lib_file_path(lib, name), 0777) != 0)
-       && (errno != EEXIST))
-      fatal_errno("mkdir: %s", name);
+   make_dir(lib_file_path(lib, name));
 }
