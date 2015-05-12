@@ -146,7 +146,8 @@ typedef enum {
    VCODE_UNIT_PROCESS,
    VCODE_UNIT_CONTEXT,
    VCODE_UNIT_FUNCTION,
-   VCODE_UNIT_PROCEDURE
+   VCODE_UNIT_PROCEDURE,
+   VCODE_UNIT_THUNK
 } vunit_kind_t;
 
 typedef enum {
@@ -219,6 +220,7 @@ vcode_type_t vcode_unit_result(void);
 vcode_block_t vcode_active_block(void);
 vcode_unit_t vcode_active_unit(void);
 vcode_unit_t vcode_unit_context(void);
+void vcode_rewind(void);
 
 void vcode_state_save(vcode_state_t *state);
 void vcode_state_restore(const vcode_state_t *state);
@@ -278,6 +280,7 @@ vcode_unit_t emit_function(ident_t name, vcode_unit_t context,
 vcode_unit_t emit_procedure(ident_t name, vcode_unit_t context);
 vcode_unit_t emit_process(ident_t name, vcode_unit_t context);
 vcode_unit_t emit_context(ident_t name);
+vcode_unit_t emit_thunk(ident_t name, vcode_unit_t context, vcode_type_t type);
 vcode_block_t emit_block(void);
 vcode_var_t emit_var(vcode_type_t type, vcode_type_t bounds, ident_t name,
                      bool is_const);

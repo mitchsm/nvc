@@ -1033,9 +1033,10 @@ void vcode_dump(void)
    case VCODE_UNIT_CONTEXT: printf("context"); break;
    case VCODE_UNIT_FUNCTION: printf("function"); break;
    case VCODE_UNIT_PROCEDURE: printf("procedure"); break;
+   case VCODE_UNIT_THUNK: printf("thunk"); break;
    }
    color_printf("$$\n");
-   if (vu->kind != VCODE_UNIT_CONTEXT)
+   if (vu->kind != VCODE_UNIT_CONTEXT && vu->kind != VCODE_UNIT_THUNK)
       color_printf("Context    $cyan$%s$$\n", istr(vu->context->name));
    printf("Blocks     %d\n", vu->blocks.count);
    printf("Registers  %d\n", vu->regs.count);
@@ -1101,13 +1102,15 @@ void vcode_dump(void)
          printf("]\n");
       }
    }
-   else if (vu->kind == VCODE_UNIT_FUNCTION
-            || vu->kind == VCODE_UNIT_PROCEDURE) {
-      if (vu->result != VCODE_INVALID_TYPE) {
-         color_printf("Result     $cyan$");
-         vcode_dump_one_type(vu->result);
-         color_printf("$$\n");
-      }
+
+   if (vu->result != VCODE_INVALID_TYPE) {
+      color_printf("Result     $cyan$");
+      vcode_dump_one_type(vu->result);
+      color_printf("$$\n");
+   }
+
+   if (vu->kind == VCODE_UNIT_FUNCTION
+       || vu->kind == VCODE_UNIT_PROCEDURE) {
 
       printf("Parameters %d\n", vu->params.count);
 
@@ -2416,6 +2419,22 @@ vcode_unit_t emit_process(ident_t name, vcode_unit_t context)
    vu->name    = name;
    vu->context = context;
    vu->depth   = vcode_unit_calc_depth(vu);
+   vu->result  = VCODE_INVALID_TYPE;
+
+   active_unit = vu;
+   vcode_select_block(emit_block());
+
+   return vu;
+}
+
+vcode_unit_t emit_thunk(ident_t name, vcode_unit_t context, vcode_type_t type)
+{
+   vcode_unit_t vu = xcalloc(sizeof(struct vcode_unit));
+   vu->kind    = VCODE_UNIT_THUNK;
+   vu->name    = name;
+   vu->context = context;
+   vu->result  = type;
+   vu->depth   = vcode_unit_calc_depth(vu);
 
    active_unit = vu;
    vcode_select_block(emit_block());
@@ -2429,6 +2448,7 @@ vcode_unit_t emit_context(ident_t name)
    vu->kind    = VCODE_UNIT_CONTEXT;
    vu->name    = name;
    vu->context = vu;
+   vu->result  = VCODE_INVALID_TYPE;
 
    active_unit = vu;
    vcode_select_block(emit_block());
@@ -3238,7 +3258,8 @@ void emit_return(vcode_reg_t reg)
    if (reg != VCODE_INVALID_REG) {
       vcode_add_arg(op, reg);
 
-      VCODE_ASSERT(active_unit->kind == VCODE_UNIT_FUNCTION,
+      VCODE_ASSERT(active_unit->kind == VCODE_UNIT_FUNCTION
+                   || active_unit->kind == VCODE_UNIT_THUNK,
                    "returning value fron non-function unit");
       VCODE_ASSERT(vtype_eq(active_unit->result, vcode_reg_type(reg)),
                    "return value incorrect type");

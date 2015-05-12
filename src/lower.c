@@ -65,9 +65,10 @@ struct case_state {
    case_arc_t    arcs[MAX_CASE_ARCS];
 };
 
-static const char *verbose = NULL;
-static bool        tmp_alloc_used = false;
-static hash_t     *vcode_objs = NULL;
+static const char  *verbose = NULL;
+static bool         tmp_alloc_used = false;
+static hash_t      *vcode_objs = NULL;
+static vcode_unit_t thunk_context = NULL;
 
 static vcode_reg_t lower_expr(tree_t expr, expr_ctx_t ctx);
 static vcode_reg_t lower_reify_expr(tree_t expr);
@@ -351,8 +352,11 @@ static vcode_type_t lower_type(type_t type)
       {
          range_t r = type_dim(type, 0);
          int64_t low, high;
-         range_bounds(r, &low, &high);
-         return vtype_int(low, high);
+         const bool folded = folded_bounds(r, &low, &high);
+         if (folded)
+            return vtype_int(low, high);
+         else
+            return vtype_int(INT64_MIN, INT64_MAX);
       }
 
    case T_ENUM:
@@ -1252,12 +1256,12 @@ static vcode_reg_t lower_builtin(tree_t fcall, ident_t builtin)
       return lower_bit_shift(BIT_SHIFT_ROL, r0, r0_type, r1);
    else if (icmp(builtin, "ror"))
       return lower_bit_shift(BIT_SHIFT_ROR, r0, r0_type, r1);
-   else if (icmp(builtin, "mulrp")) {
+   else if (icmp(builtin, "mulrp") || icmp(builtin, "mulri")) {
       vcode_type_t vreal  = vtype_real();
       vcode_type_t rtype  = lower_type(tree_type(fcall));
       return emit_cast(rtype, rtype, emit_mul(r0, emit_cast(vreal, vreal, r1)));
    }
-   else if (icmp(builtin, "mulpr")) {
+   else if (icmp(builtin, "mulpr") || icmp(builtin, "mulir")) {
       vcode_type_t vreal  = vtype_real();
       vcode_type_t rtype  = lower_type(tree_type(fcall));
       return emit_cast(rtype, rtype, emit_mul(emit_cast(vreal, vreal, r0), r1));
@@ -1268,6 +1272,13 @@ static vcode_reg_t lower_builtin(tree_t fcall, ident_t builtin)
       return emit_cast(rtype, rtype,
                        emit_div(emit_cast(vreal, vreal, r0),
                                 r1, tree_index(fcall)));
+   }
+   else if (icmp(builtin, "divri")) {
+      vcode_type_t vreal  = vtype_real();
+      vcode_type_t rtype  = lower_type(tree_type(fcall));
+      return emit_cast(rtype, rtype,
+                       emit_div(r0, emit_cast(vreal, vreal, r1),
+                                tree_index(fcall)));
    }
    else
       fatal_at(tree_loc(fcall), "cannot lower builtin %s", istr(builtin));
@@ -4528,13 +4539,21 @@ static void lower_package(tree_t unit)
    lower_finished();
 }
 
+static void lower_set_verbose(void)
+{
+   static bool set = false;
+   if (!set) {
+      const char *venv = getenv("NVC_LOWER_VERBOSE");
+      if (venv != NULL)
+         verbose = isalpha((int)venv[0]) ? venv : "";
+      else
+         verbose = opt_get_str("dump-vcode");
+   }
+}
+
 void lower_unit(tree_t unit)
 {
-   const char *venv = getenv("NVC_LOWER_VERBOSE");
-   if (venv != NULL)
-      verbose = isalpha((int)venv[0]) ? venv : "";
-   else
-      verbose = opt_get_str("dump-vcode");
+   lower_set_verbose();
 
    vcode_objs = hash_new(4096, true);
 
@@ -4557,4 +4576,26 @@ void lower_unit(tree_t unit)
 
    hash_free(vcode_objs);
    vcode_objs = NULL;
+}
+
+vcode_unit_t lower_thunk(tree_t fcall)
+{
+   lower_set_verbose();
+
+   if (thunk_context == NULL)
+      thunk_context = emit_context(ident_new("thunk"));
+
+   vcode_select_unit(thunk_context);
+
+   fmt_loc(stdout, tree_loc(fcall));
+   vcode_type_t vtype = lower_type(tree_type(fcall));
+   vcode_unit_t thunk = emit_thunk(tree_ident(fcall), thunk_context, vtype);
+
+   vcode_reg_t result_reg = lower_expr(fcall, EXPR_RVALUE);
+   emit_return(emit_cast(vtype, vtype, result_reg));
+
+   lower_finished();
+
+   vcode_close();
+   return thunk;
 }

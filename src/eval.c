@@ -653,6 +653,17 @@ tree_t eval(tree_t fcall)
 {
    assert(tree_kind(fcall) == T_FCALL);
 
+   const int nparams = tree_params(fcall);
+   for (int i = 0; i < nparams; i++) {
+      const tree_kind_t kind = tree_kind(tree_value(tree_param(fcall, i)));
+      if (kind != T_LITERAL)
+         return fcall;
+   }
+
+   vcode_unit_t thunk = lower_thunk(fcall);
+   if (thunk == NULL)
+      return fcall;
+
    static bool have_debug = false;
    if (!have_debug) {
       debug = (getenv("NVC_EVAL_DEBUG") != NULL);

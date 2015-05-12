@@ -85,4 +85,7 @@ int parse_errors(void);
 // Generate vcode for a design unit
 void lower_unit(tree_t unit);
 
+// Generate vcode for an isolated function call
+vcode_unit_t lower_thunk(tree_t fcall);
+
 #endif  // _PHASE_H
