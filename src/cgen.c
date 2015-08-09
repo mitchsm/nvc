@@ -2740,6 +2740,8 @@ static void cgen_function(LLVMTypeRef display_type)
    cgen_locals(&ctx);
    cgen_code(&ctx);
    cgen_free_context(&ctx);
+
+   printf("cgen_function %s\n", istr(vcode_unit_name()));
 }
 
 static LLVMTypeRef cgen_state_type(cgen_ctx_t *ctx)
@@ -3527,7 +3529,7 @@ void cgen(tree_t top)
    if (kind != T_ELAB && kind != T_PACK_BODY && kind != T_PACKAGE)
       fatal("cannot generate code for %s", tree_kind_str(kind));
 
-   module = LLVMModuleCreateWithName(istr(tree_ident(top)));
+   module  = LLVMModuleCreateWithName(istr(tree_ident(top)));
    builder = LLVMCreateBuilder();
 
    cgen_module_name(top);
@@ -3554,4 +3556,34 @@ void cgen(tree_t top)
    LLVMDisposeBuilder(builder);
 
    tree_add_attr_ptr(top, llvm_i, module);
+   printf("add ptr %s %p\n", istr(tree_ident(top)), module);
+}
+
+LLVMModuleRef cgen_thunk(vcode_unit_t thunk)
+{
+   vcode_select_unit(thunk);
+   assert(vcode_unit_kind() == VCODE_UNIT_THUNK);
+
+   const char *name = istr(vcode_unit_name());
+   module  = LLVMModuleCreateWithName(name);
+   builder = LLVMCreateBuilder();
+
+   LLVMTypeRef result = cgen_type(vcode_unit_result());
+   LLVMValueRef fn =
+      LLVMAddFunction(module, name,
+                      LLVMFunctionType(result, NULL, 0, false));
+
+   cgen_ctx_t ctx = {
+      .fn = fn
+   };
+   cgen_alloc_context(&ctx);
+   cgen_code(&ctx);
+
+   if (LLVMVerifyModule(module, LLVMPrintMessageAction, NULL))
+      fatal("LLVM verification failed");
+
+   LLVMDumpModule(module);
+
+   LLVMDisposeBuilder(builder);
+   return module;
 }

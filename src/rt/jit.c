@@ -21,7 +21,6 @@
 #include "tree.h"
 #include "common.h"
 
-#include <assert.h>
 #include <limits.h>
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -34,6 +33,9 @@
 #include <llvm-c/Core.h>
 #include <llvm-c/BitReader.h>
 #include <llvm-c/ExecutionEngine.h>
+
+#undef NDEBUG
+#include <assert.h>
 
 static LLVMModuleRef          module = NULL;
 static LLVMExecutionEngineRef exec_engine = NULL;

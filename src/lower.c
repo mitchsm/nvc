@@ -4132,10 +4132,21 @@ static void lower_decls(tree_t scope, vcode_unit_t context)
             tree_add_attr_int(d, nested_i, nest_depth + 1);
 
          switch (kind) {
-         case T_FUNC_BODY: lower_func_body(d, context); break;
-         case T_PROC_BODY: lower_proc_body(d, context); break;
-         case T_PROT_BODY: lower_protected_body(d); break;
-         default: break;
+         case T_FUNC_BODY:
+            lower_func_body(d, context);
+            break;
+         case T_PROC_BODY:
+            lower_proc_body(d, context);
+            break;
+         case T_PROT_BODY:
+            lower_protected_body(d);
+            break;
+         case T_FUNC_DECL:
+         case T_PROC_DECL:
+            tree_add_attr_str(d, mangled_i, lower_mangle_func(d, context));
+            break;
+         default:
+            break;
          }
 
          vcode_select_unit(context);
@@ -4580,6 +4591,8 @@ void lower_unit(tree_t unit)
 
 vcode_unit_t lower_thunk(tree_t fcall)
 {
+   static int unique = 0;
+
    lower_set_verbose();
 
    if (thunk_context == NULL)
@@ -4587,9 +4600,12 @@ vcode_unit_t lower_thunk(tree_t fcall)
 
    vcode_select_unit(thunk_context);
 
+   char *suffix LOCAL = xasprintf("%d", unique++);
+   ident_t name = ident_prefix(tree_ident(fcall), ident_new(suffix), '.');
+
    fmt_loc(stdout, tree_loc(fcall));
    vcode_type_t vtype = lower_type(tree_type(fcall));
-   vcode_unit_t thunk = emit_thunk(tree_ident(fcall), thunk_context, vtype);
+   vcode_unit_t thunk = emit_thunk(name, thunk_context, vtype);
 
    vcode_reg_t result_reg = lower_expr(fcall, EXPR_RVALUE);
    emit_return(emit_cast(vtype, vtype, result_reg));

@@ -48,6 +48,9 @@ void elab_set_generic(const char *name, const char *value);
 // Generate LLVM bitcode for an elaborated design
 void cgen(tree_t top);
 
+// Generate LLVM bitcode for a thunk
+LLVMModuleRef cgen_thunk(vcode_unit_t thunk);
+
 // Dump out a VHDL representation of the given unit
 void dump(tree_t top);
 

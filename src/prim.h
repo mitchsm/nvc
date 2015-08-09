@@ -69,4 +69,6 @@ typedef uint32_t netid_t;
 
 #define NETID_INVALID UINT32_MAX
 
+typedef struct LLVMOpaqueModule *LLVMModuleRef;
+
 #endif  // _PRIM_H

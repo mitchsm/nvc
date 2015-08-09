@@ -162,16 +162,12 @@ static int analyse(int argc, char **argv)
 
    for (int i = 0; i < n_units; i++) {
       tree_kind_t kind = tree_kind(units[i]);
-      const bool need_cgen =
-         (kind == T_PACK_BODY)
-         || ((kind == T_PACKAGE) && pack_needs_cgen(units[i]));
+      const bool need_cgen = kind == T_PACK_BODY || kind == T_PACKAGE;
       if (need_cgen)
          opt(units[i]);
       else
          units[i] = NULL;
    }
-
-   lib_save(lib_work());
 
    for (int i = 0; i < n_units; i++) {
       if (units[i] != NULL) {
@@ -180,8 +176,12 @@ static int analyse(int argc, char **argv)
       }
    }
 
+   lib_save(lib_work());
+
    argc -= next_cmd - 1;
    argv += next_cmd - 1;
+
+   printf("analysis done\n");
 
    return argc > 1 ? process_command(argc, argv) : EXIT_SUCCESS;
 }

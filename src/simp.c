@@ -318,7 +318,7 @@ static tree_t simp_attr_ref(tree_t t, simp_ctx_t *ctx)
             case ATTR_HIGH:
                return make_ref(type_enum_literal(type, nlits - 1));
             case ATTR_ASCENDING:
-               return get_bool_lit(t, true);
+               return get_enum_lit(t, true);
             default:
                fatal_trace("invalid enumeration attribute %d", predef);
             }
@@ -361,7 +361,7 @@ static tree_t simp_attr_ref(tree_t t, simp_ctx_t *ctx)
          else if (predef == ATTR_RIGHT)
             return r.right;
          else if (predef == ATTR_ASCENDING && known_dir)
-            return get_bool_lit(t, (r.kind == RANGE_TO));
+            return get_enum_lit(t, (r.kind == RANGE_TO));
          else
             return t;
       }

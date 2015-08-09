@@ -205,10 +205,10 @@ bool folded_bool(tree_t t, bool *b)
    return false;
 }
 
-tree_t get_bool_lit(tree_t t, bool v)
+tree_t get_enum_lit(tree_t t, int pos)
 {
    type_t bool_type = tree_type(t);
-   tree_t lit = type_enum_literal(bool_type, v ? 1 : 0);
+   tree_t lit = type_enum_literal(bool_type, pos);
 
    tree_t b = tree_new(T_REF);
    tree_set_loc(b, tree_loc(t));
@@ -749,4 +749,5 @@ void intern_strings(void)
    llvm_i           = ident_new("llvm");
    wait_level_i     = ident_new("wait_level");
    impure_io_i      = ident_new("impure_io");
+   mangled_i        = ident_new("mangled");
 }

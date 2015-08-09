@@ -186,7 +186,7 @@ void object_one_time_init(void)
 
       // Increment this each time a incompatible change is made to the
       // on-disk format not expressed in the tree and type items table
-      const uint32_t format_fudge = 7;
+      const uint32_t format_fudge = 8;
 
       format_digest += format_fudge * UINT32_C(2654435761);
 
@@ -621,9 +621,17 @@ void object_write(object_t *object, object_wr_ctx_t *ctx)
          }
          else if (ITEM_ATTRS & mask) {
             const attr_tab_t *attrs = &(object->items[n].attrs);
-            write_u16(attrs->num, ctx->file);
+            int n_not_ptr = 0;
             for (unsigned i = 0; i < attrs->num; i++) {
-               write_u16(attrs->table[i].kind, ctx->file);
+               if (attrs->table[i].kind != A_PTR)
+                  n_not_ptr++;
+            }
+            write_u16(n_not_ptr, ctx->file);
+            for (unsigned i = 0; i < attrs->num; i++) {
+               if (attrs->table[i].kind == A_PTR)
+                  continue;
+
+               write_u8(attrs->table[i].kind, ctx->file);
                ident_write(attrs->table[i].name, ctx->ident_ctx);
 
                switch (attrs->table[i].kind) {
@@ -640,7 +648,8 @@ void object_write(object_t *object, object_wr_ctx_t *ctx)
                   break;
 
                case A_PTR:
-                  fatal("pointer attributes cannot be saved");
+                  // Cannot be saved
+                  break;
                }
             }
          }
@@ -827,7 +836,7 @@ object_t *object_read(object_rd_ctx_t *ctx, int tag)
             }
 
             for (unsigned i = 0; i < attrs->num; i++) {
-               attrs->table[i].kind = read_u16(ctx->file);
+               attrs->table[i].kind = read_u8(ctx->file);
                attrs->table[i].name = ident_read(ctx->ident_ctx);
 
                switch (attrs->table[i].kind) {
