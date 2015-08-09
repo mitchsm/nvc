@@ -3554,7 +3554,6 @@ void cgen(tree_t top)
    LLVMDisposeBuilder(builder);
 
    tree_add_attr_ptr(top, llvm_i, module);
-   printf("add ptr %s %p\n", istr(tree_ident(top)), module);
 }
 
 LLVMModuleRef cgen_thunk(vcode_unit_t thunk)
@@ -3577,10 +3576,11 @@ LLVMModuleRef cgen_thunk(vcode_unit_t thunk)
    cgen_alloc_context(&ctx);
    cgen_code(&ctx);
 
+   if (opt_get_int("dump-llvm"))
+      LLVMDumpModule(module);
+
    if (LLVMVerifyModule(module, LLVMPrintMessageAction, NULL))
       fatal("LLVM verification failed");
-
-   LLVMDumpModule(module);
 
    LLVMDisposeBuilder(builder);
    return module;

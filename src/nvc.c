@@ -181,8 +181,6 @@ static int analyse(int argc, char **argv)
    argc -= next_cmd - 1;
    argv += next_cmd - 1;
 
-   printf("analysis done\n");
-
    return argc > 1 ? process_command(argc, argv) : EXIT_SUCCESS;
 }
 

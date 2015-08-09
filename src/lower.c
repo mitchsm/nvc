@@ -69,6 +69,8 @@ static const char  *verbose = NULL;
 static bool         tmp_alloc_used = false;
 static hash_t      *vcode_objs = NULL;
 static vcode_unit_t thunk_context = NULL;
+static bool         thunking = false;
+static bool         thunk_failed = false;
 
 static vcode_reg_t lower_expr(tree_t expr, expr_ctx_t ctx);
 static vcode_reg_t lower_reify_expr(tree_t expr);
@@ -1389,8 +1391,12 @@ static vcode_reg_t lower_literal(tree_t lit, expr_ctx_t ctx)
 
 static int lower_get_vcode_obj(tree_t t)
 {
-   const void *ptr = hash_get(vcode_objs, t);
-   return (uintptr_t)ptr - 1;
+   if (vcode_objs == NULL)
+      return -1;
+   else {
+      const void *ptr = hash_get(vcode_objs, t);
+      return (uintptr_t)ptr - 1;
+   }
 }
 
 static void lower_put_vcode_obj(tree_t t, int obj)
@@ -1495,8 +1501,24 @@ static vcode_reg_t lower_param_ref(tree_t decl, expr_ctx_t ctx)
 {
    vcode_reg_t reg = lower_get_vcode_obj(decl);
    if (reg == VCODE_INVALID_REG && tree_class(decl) != C_SIGNAL) {
-      vcode_dump();
-      fatal_trace("missing register for parameter %s", istr(tree_ident(decl)));
+      if (thunking) {
+         // Fake a value
+         thunk_failed = true;
+
+         if (tree_has_value(decl))
+            return lower_expr(tree_value(decl), ctx);
+
+         type_t type = tree_type(decl);
+         if (type_is_scalar(type))
+            return emit_const(lower_type(type), 0);
+         else
+            return VCODE_INVALID_REG;
+      }
+      else {
+         vcode_dump();
+         fatal_trace("missing register for parameter %s",
+                     istr(tree_ident(decl)));
+      }
    }
 
    const int depth = tree_attr_int(decl, nested_i, 0);
@@ -4567,6 +4589,7 @@ void lower_unit(tree_t unit)
    lower_set_verbose();
 
    vcode_objs = hash_new(4096, true);
+   thunking = false;
 
    switch (tree_kind(unit)) {
    case T_ELAB:
@@ -4598,6 +4621,9 @@ vcode_unit_t lower_thunk(tree_t fcall)
    if (thunk_context == NULL)
       thunk_context = emit_context(ident_new("thunk"));
 
+   thunking = true;
+   thunk_failed = false;
+
    vcode_select_unit(thunk_context);
 
    char *suffix LOCAL = xasprintf("%d", unique++);
@@ -4612,5 +4638,6 @@ vcode_unit_t lower_thunk(tree_t fcall)
    lower_finished();
 
    vcode_close();
-   return thunk;
+
+   return thunk_failed ? NULL : thunk;
 }

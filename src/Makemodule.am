@@ -27,8 +27,6 @@ lib_libnvc_a_SOURCES = \
 	src/eval.c \
 	src/link.c
 
-lib_libnvc_a_CFLAGS = $(AM_CFLAGS) $(LLVM_CFLAGS)
-
 bin_nvc_SOURCES = src/nvc.c
 
 if FORCE_CXX_LINK

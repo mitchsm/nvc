@@ -81,7 +81,6 @@ static LLVMExecutionEngineRef eval_exec_engine_for(tree_t decl)
 
    ident_t lname = ident_until(name, '.');
    ident_t uname = ident_runtil(name, '.');
-   printf("lname=%s uname=%s\n", istr(lname), istr(uname));
 
    lib_t lib = lib_find(istr(lname), false, true);
    if (lib == NULL)
@@ -115,8 +114,6 @@ static LLVMExecutionEngineRef eval_exec_engine_for(tree_t decl)
 
       if (LLVMParseBitcode(buf, &module, &error))
          fatal("error parsing bitcode: %s", error);
-
-      LLVMDumpModule(module);
 
       LLVMDisposeMemoryBuffer(buf);
    }
@@ -185,7 +182,6 @@ tree_t eval(tree_t fcall)
       return fcall;
 
    vcode_select_unit(thunk);
-   vcode_dump();
 
    LLVMModuleRef module = cgen_thunk(thunk);
    LLVMAddModule(exec_engine, module);
@@ -195,8 +191,6 @@ tree_t eval(tree_t fcall)
       fatal("cannot find LLVM bitcode for thunk");
 
    LLVMGenericValueRef value = LLVMRunFunction(exec_engine, fn, 0, NULL);
-   const int64_t ival = LLVMGenericValueToInt(value, true);
-   printf("ival=%d\n", (int)ival);
 
    type_t result = tree_type(fcall);
    if (type_is_enum(result))
