@@ -726,7 +726,6 @@ void intern_strings(void)
    signed_i         = ident_new("IEEE.NUMERIC_STD.SIGNED");
    unsigned_i       = ident_new("IEEE.NUMERIC_STD.UNSIGNED");
    foreign_i        = ident_new("FOREIGN");
-   vcode_obj_i      = ident_new("vcode_obj");
    nested_i         = ident_new("nested");
    drives_all_i     = ident_new("drives_all");
    driver_init_i    = ident_new("driver_init");

@@ -20,6 +20,7 @@
 #include "vcode.h"
 #include "common.h"
 #include "rt/rt.h"
+#include "hash.h"
 
 #include <assert.h>
 #include <stdlib.h>
@@ -65,7 +66,8 @@ struct case_state {
 };
 
 static const char *verbose = NULL;
-static bool tmp_alloc_used = false;
+static bool        tmp_alloc_used = false;
+static hash_t     *vcode_objs = NULL;
 
 static vcode_reg_t lower_expr(tree_t expr, expr_ctx_t ctx);
 static vcode_reg_t lower_reify_expr(tree_t expr);
@@ -1374,9 +1376,20 @@ static vcode_reg_t lower_literal(tree_t lit, expr_ctx_t ctx)
    }
 }
 
+static int lower_get_vcode_obj(tree_t t)
+{
+   const void *ptr = hash_get(vcode_objs, t);
+   return (uintptr_t)ptr - 1;
+}
+
+static void lower_put_vcode_obj(tree_t t, int obj)
+{
+   hash_put(vcode_objs, t, (void *)(uintptr_t)(obj + 1));
+}
+
 static vcode_var_t lower_get_var(tree_t decl)
 {
-   vcode_var_t var = tree_attr_int(decl, vcode_obj_i, VCODE_INVALID_VAR);
+   vcode_var_t var = lower_get_vcode_obj(decl);
 
    const bool is_extern =
       var == VCODE_INVALID_VAR
@@ -1401,7 +1414,7 @@ static vcode_var_t lower_get_var(tree_t decl)
 
 static vcode_signal_t lower_get_signal(tree_t decl)
 {
-   vcode_signal_t sig = tree_attr_int(decl, vcode_obj_i, VCODE_INVALID_SIGNAL);
+   vcode_signal_t sig = lower_get_vcode_obj(decl);
    if (sig == VCODE_INVALID_SIGNAL) {
       vcode_state_t state;
       vcode_state_save(&state);
@@ -1469,7 +1482,7 @@ static vcode_reg_t lower_signal_ref(tree_t decl, expr_ctx_t ctx)
 
 static vcode_reg_t lower_param_ref(tree_t decl, expr_ctx_t ctx)
 {
-   vcode_reg_t reg = tree_attr_int(decl, vcode_obj_i, VCODE_INVALID_REG);
+   vcode_reg_t reg = lower_get_vcode_obj(decl);
    if (reg == VCODE_INVALID_REG && tree_class(decl) != C_SIGNAL) {
       vcode_dump();
       fatal_trace("missing register for parameter %s", istr(tree_ident(decl)));
@@ -3290,7 +3303,7 @@ static void lower_for(tree_t stmt, loop_stack_t *loops)
    tree_set_ident(idecl, ident);
 
    vcode_var_t ivar = emit_var(vtype, bounds, ident, false);
-   tree_add_attr_int(idecl, vcode_obj_i, ivar);
+   lower_put_vcode_obj(idecl, ivar);
 
    vcode_reg_t init_reg = r.kind == RANGE_RDYN ? right_reg : left_reg;
    emit_store(init_reg, ivar);
@@ -3851,7 +3864,7 @@ static void lower_var_decl(tree_t decl)
    vcode_type_t vbounds = lower_bounds(type);
    vcode_var_t var = emit_var(vtype, vbounds, tree_ident(decl),
                               tree_kind(decl) == T_CONST_DECL);
-   tree_add_attr_int(decl, vcode_obj_i, var);
+   lower_put_vcode_obj(decl, var);
 
    if (type_is_protected(type))
       lower_protected_init(decl, emit_index(var, VCODE_INVALID_REG));
@@ -3948,7 +3961,7 @@ static void lower_signal_decl(tree_t decl)
    vcode_type_t stype = vtype_signal(ltype);
    vcode_signal_t sig = emit_signal(stype, bounds, name, shadow,
                                     nets, nnets);
-   tree_add_attr_int(decl, vcode_obj_i, sig);
+   lower_put_vcode_obj(decl, sig);
 
    if (nnets == 0)
       return;
@@ -3995,7 +4008,7 @@ static void lower_file_decl(tree_t decl)
    type_t type = tree_type(decl);
    vcode_type_t vtype = lower_type(type);
    vcode_var_t var = emit_var(vtype, vtype, tree_ident(decl), false);
-   tree_add_attr_int(decl, vcode_obj_i, var);
+   lower_put_vcode_obj(decl, var);
 
    emit_store(emit_null(vtype), var);
 
@@ -4060,22 +4073,6 @@ static void lower_finished(void)
    if (verbose != NULL) {
       if (*verbose == '\0' || strstr(istr(vcode_unit_name()), verbose) != NULL)
          vcode_dump();
-   }
-}
-
-static void lower_cleanup(tree_t scope)
-{
-   if (tree_kind(scope) == T_FUNC_BODY) {
-      const int nports = tree_ports(scope);
-      for (int i = 0; i < nports; i++)
-         tree_remove_attr(tree_port(scope, i), vcode_obj_i);
-   }
-
-   const int ndecls = tree_decls(scope);
-   for (int i = 0; i < ndecls; i++) {
-      tree_t decl = tree_decl(scope, i);
-      if (tree_kind(decl) != T_USE)
-         tree_remove_attr(decl, vcode_obj_i);
    }
 }
 
@@ -4207,7 +4204,7 @@ static void lower_subprogram_ports(tree_t body, bool has_subprograms)
       }
 
       vcode_reg_t reg = emit_param(vtype, vbounds, tree_ident(p));
-      tree_add_attr_int(p, vcode_obj_i, reg);
+      lower_put_vcode_obj(p, reg);
       if (has_subprograms)
          tree_add_attr_int(p, nested_i, vcode_unit_depth());
    }
@@ -4243,7 +4240,6 @@ static void lower_proc_body(tree_t body, vcode_unit_t context)
    lower_finished();
 
    tree_set_code(body, vu);
-   lower_cleanup(body);
 }
 
 static void lower_func_body(tree_t body, vcode_unit_t context)
@@ -4253,6 +4249,7 @@ static void lower_func_body(tree_t body, vcode_unit_t context)
    vcode_type_t vtype = lower_func_result_type(body);
 
    ident_t name = lower_mangle_func(body, context);
+   tree_add_attr_str(body, mangled_i, name);
    vcode_unit_t vu = emit_function(name, context, vtype);
 
    const bool has_subprograms = lower_has_subprograms(body);
@@ -4268,8 +4265,6 @@ static void lower_func_body(tree_t body, vcode_unit_t context)
 
    assert(!tree_has_code(body));
    tree_set_code(body, vu);
-
-   lower_cleanup(body);
 }
 
 static bool lower_driver_nets(tree_t t, tree_t *decl,
@@ -4488,8 +4483,6 @@ static void lower_process(tree_t proc, vcode_unit_t context)
 
    assert(!tree_has_code(proc));
    tree_set_code(proc, vu);
-
-   lower_cleanup(proc);
 }
 
 static void lower_elab(tree_t unit)
@@ -4509,8 +4502,6 @@ static void lower_elab(tree_t unit)
       assert(tree_kind(s) == T_PROCESS);
       lower_process(s, context);
    }
-
-   lower_cleanup(unit);
 }
 
 static void lower_pack_body(tree_t unit)
@@ -4523,8 +4514,6 @@ static void lower_pack_body(tree_t unit)
    emit_return(VCODE_INVALID_REG);
 
    lower_finished();
-
-   lower_cleanup(unit);
 }
 
 static void lower_package(tree_t unit)
@@ -4537,7 +4526,6 @@ static void lower_package(tree_t unit)
    emit_return(VCODE_INVALID_REG);
 
    lower_finished();
-   lower_cleanup(unit);
 }
 
 void lower_unit(tree_t unit)
@@ -4547,6 +4535,8 @@ void lower_unit(tree_t unit)
       verbose = isalpha((int)venv[0]) ? venv : "";
    else
       verbose = opt_get_str("dump-vcode");
+
+   vcode_objs = hash_new(4096, true);
 
    switch (tree_kind(unit)) {
    case T_ELAB:
@@ -4564,4 +4554,7 @@ void lower_unit(tree_t unit)
    }
 
    vcode_close();
+
+   hash_free(vcode_objs);
+   vcode_objs = NULL;
 }

@@ -167,7 +167,6 @@ GLOBAL ident_t unsigned_i;
 GLOBAL ident_t signed_i;
 GLOBAL ident_t foreign_i;
 GLOBAL ident_t nested_i;
-GLOBAL ident_t vcode_obj_i;
 GLOBAL ident_t drives_all_i;
 GLOBAL ident_t driver_init_i;
 GLOBAL ident_t GLOBAL_i;
