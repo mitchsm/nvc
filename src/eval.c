@@ -98,7 +98,26 @@ static LLVMExecutionEngineRef eval_exec_engine_for(tree_t decl)
    printf(" --> LLVM module is %p\n", tree_attr_ptr(unit, llvm_i));
 
    LLVMModuleRef module = tree_attr_ptr(unit, llvm_i);
-   assert(module);
+   if (module == NULL) {
+      char *bcname LOCAL = xasprintf("_%s.bc", istr(tree_ident(unit)));
+      char path[PATH_MAX];
+      lib_realpath(lib, bcname, path, sizeof(path));
+
+      notef("loading LLVM bitcode for %s", istr(tree_ident(unit)));
+
+      char *error;
+      LLVMMemoryBufferRef buf;
+      if (LLVMCreateMemoryBufferWithContentsOfFile(path, &buf, &error))
+         fatal("error reading bitcode from %s: %s", path, error);
+
+      if (LLVMParseBitcode(buf, &module, &error))
+         fatal("error parsing bitcode: %s", error);
+
+      LLVMDumpModule(module);
+
+      LLVMDisposeMemoryBuffer(buf);
+   }
+
    LLVMAddModule(exec_engine, module);
 
    if (LLVMFindFunction(exec_engine, istr(mangled), &fn))
@@ -149,7 +168,7 @@ tree_t eval(tree_t fcall)
    printf("ival=%d\n", (int)ival);
 
    if (type_is_enum(result))
-      return get_enum_lit(fcall, LLVMGenericValueToInt(value, true));
+      return get_enum_lit(fcall, LLVMGenericValueToInt(value, false));
    else if (type_is_integer(result))
       return get_int_lit(fcall, LLVMGenericValueToInt(value, true));
 
