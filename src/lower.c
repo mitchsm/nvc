@@ -4603,7 +4603,6 @@ vcode_unit_t lower_thunk(tree_t fcall)
    char *suffix LOCAL = xasprintf("%d", unique++);
    ident_t name = ident_prefix(tree_ident(fcall), ident_new(suffix), '.');
 
-   fmt_loc(stdout, tree_loc(fcall));
    vcode_type_t vtype = lower_type(tree_type(fcall));
    vcode_unit_t thunk = emit_thunk(name, thunk_context, vtype);
 

@@ -1674,7 +1674,6 @@ static bool sem_check_type_decl(tree_t t)
       {
          sem_declare_predefined_ops(t);
 
-         // Check the units
          const int nunits = type_units(type);
          for (int i = 0; i < nunits; i++) {
             tree_t u = type_unit(type, i);
@@ -1682,14 +1681,25 @@ static bool sem_check_type_decl(tree_t t)
             if (!sem_check_constrained(u, type))
                return false;
          }
+
+         range_t r = type_dim(type, 0);
+
+         if (!sem_check(r.left))
+            return false;
+
+         if (!sem_check(r.right))
+            return false;
+
+         tree_set_type(r.left, type);
+         tree_set_type(r.right, type);
+
+         return true;
       }
 
-      // Fall-through
    case T_INTEGER:
    case T_REAL:
       {
-         if (kind != T_PHYSICAL)
-            sem_declare_predefined_ops(t);
+         sem_declare_predefined_ops(t);
 
          range_t r = type_dim(type, 0);
 

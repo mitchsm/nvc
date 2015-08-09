@@ -131,20 +131,50 @@ static LLVMExecutionEngineRef eval_exec_engine_for(tree_t decl)
    return exec_engine;
 }
 
+static bool eval_possible(tree_t fcall)
+{
+   type_t result = tree_type(fcall);
+   if (!type_is_scalar(result))
+      return false;
+
+   if (tree_attr_int(tree_ref(fcall), impure_i, 0))
+      return NULL;
+
+   const int nparams = tree_params(fcall);
+   for (int i = 0; i < nparams; i++) {
+      tree_t p = tree_value(tree_param(fcall, i));
+      const tree_kind_t kind = tree_kind(p);
+      switch (kind) {
+      case T_LITERAL:
+         break;
+
+      case T_FCALL:
+         if (!eval_possible(p))
+            return false;
+         break;
+
+      case T_REF:
+         {
+            const tree_kind_t dkind = tree_kind(tree_ref(p));
+            if (dkind == T_UNIT_DECL || dkind == T_ENUM_LIT)
+               break;
+         }
+         // Fall-through
+
+      default:
+         return false;
+      }
+   }
+
+   return true;
+}
+
 tree_t eval(tree_t fcall)
 {
    assert(tree_kind(fcall) == T_FCALL);
 
-   type_t result = tree_type(fcall);
-   if (!type_is_scalar(result))
+   if (!eval_possible(fcall))
       return fcall;
-
-   const int nparams = tree_params(fcall);
-   for (int i = 0; i < nparams; i++) {
-      const tree_kind_t kind = tree_kind(tree_value(tree_param(fcall, i)));
-      if (kind != T_LITERAL)
-         return fcall;
-   }
 
    LLVMExecutionEngineRef exec_engine = eval_exec_engine_for(tree_ref(fcall));
    if (exec_engine == NULL)
@@ -158,8 +188,6 @@ tree_t eval(tree_t fcall)
    vcode_dump();
 
    LLVMModuleRef module = cgen_thunk(thunk);
-   printf("module=%p\n", module);
-
    LLVMAddModule(exec_engine, module);
 
    LLVMValueRef fn;
@@ -170,10 +198,15 @@ tree_t eval(tree_t fcall)
    const int64_t ival = LLVMGenericValueToInt(value, true);
    printf("ival=%d\n", (int)ival);
 
+   type_t result = tree_type(fcall);
    if (type_is_enum(result))
       return get_enum_lit(fcall, LLVMGenericValueToInt(value, false));
-   else if (type_is_integer(result))
+   else if (type_is_integer(result) || type_is_physical(result))
       return get_int_lit(fcall, LLVMGenericValueToInt(value, true));
+   else if (type_is_real(result)) {
+      const double dval = LLVMGenericValueToFloat(LLVMDoubleType(), value);
+      return get_real_lit(fcall, dval);
+   }
 
    return fcall;
 }

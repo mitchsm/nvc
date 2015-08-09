@@ -207,13 +207,13 @@ bool folded_bool(tree_t t, bool *b)
 
 tree_t get_enum_lit(tree_t t, int pos)
 {
-   type_t bool_type = tree_type(t);
-   tree_t lit = type_enum_literal(bool_type, pos);
+   type_t type = type_base_recur(tree_type(t));
+   tree_t lit = type_enum_literal(type, pos);
 
    tree_t b = tree_new(T_REF);
    tree_set_loc(b, tree_loc(t));
    tree_set_ref(b, lit);
-   tree_set_type(b, bool_type);
+   tree_set_type(b, type);
    tree_set_ident(b, tree_ident(lit));
 
    return b;
@@ -529,9 +529,12 @@ tree_t make_default_value(type_t type, const loc_t *loc)
       }
 
    case T_INTEGER:
-   case T_PHYSICAL:
    case T_REAL:
       return type_dim(type, 0).left;
+
+   case T_PHYSICAL:
+      return call_builtin("mul", type, type_dim(type, 0).left,
+                          make_ref(type_unit(type, 0)), NULL);
 
    case T_ENUM:
       return make_ref(type_enum_literal(base, 0));

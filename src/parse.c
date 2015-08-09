@@ -532,29 +532,6 @@ static tree_t get_time(int64_t fs)
    return f;
 }
 
-static tree_t int_to_physical(tree_t t, tree_t unit)
-{
-   tree_t ref = tree_new(T_REF);
-   tree_set_ident(ref, tree_ident(unit));
-
-   tree_t fcall = tree_new(T_FCALL);
-   tree_set_loc(fcall, tree_loc(t));
-   tree_set_ident(fcall, ident_new("\"*\""));
-
-   tree_t a = tree_new(T_PARAM);
-   tree_set_subkind(a, P_POS);
-   tree_set_value(a, t);
-
-   tree_t b = tree_new(T_PARAM);
-   tree_set_subkind(b, P_POS);
-   tree_set_value(b, ref);
-
-   tree_add_param(fcall, a);
-   tree_add_param(fcall, b);
-
-   return fcall;
-}
-
 static void set_delay_mechanism(tree_t t, tree_t reject)
 {
    if (reject == NULL) {
@@ -2289,8 +2266,6 @@ static type_t p_physical_type_definition(range_t r)
    tree_t base = p_base_unit_declaration();
    type_add_unit(t, base);
 
-   r.left  = int_to_physical(r.left, base);
-   r.right = int_to_physical(r.right, base);
    type_add_dim(t, r);
 
    while (scan(tINT, tREAL, tID)) {
