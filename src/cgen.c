@@ -2740,8 +2740,6 @@ static void cgen_function(LLVMTypeRef display_type)
    cgen_locals(&ctx);
    cgen_code(&ctx);
    cgen_free_context(&ctx);
-
-   printf("cgen_function %s\n", istr(vcode_unit_name()));
 }
 
 static LLVMTypeRef cgen_state_type(cgen_ctx_t *ctx)

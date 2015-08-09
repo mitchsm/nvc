@@ -60,7 +60,7 @@ AC_DEFUN([AX_LLVM_C],
                 LLVM_VERSION="$($ac_llvm_config_path --version)"
                 llvm_ver_num=`echo $LLVM_VERSION | sed 's/\(@<:@0-9@:>@\{1,\}\)\.\(@<:@0-9@:>@\{1,\}\).*/\1\2/'`
 
-                LLVM_CFLAGS=`$ac_llvm_config_path --cflags`
+                LLVM_CFLAGS=`$ac_llvm_config_path --cppflags`
                 LLVM_CXXFLAGS=`$ac_llvm_config_path --cxxflags`
 
                 # The `sed' command here filters out system libraries for

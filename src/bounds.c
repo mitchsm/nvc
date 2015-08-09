@@ -128,6 +128,7 @@ static tree_t bounds_check_call_args(tree_t t)
          if (!folded_bounds(r, &low, &high))
             continue;
 
+         continue;
          if ((ival < low) || (ival > high))
             bounds_error(value, "value %"PRIi64" out of bounds %"PRIi64" %s "
                          "%"PRIi64" for parameter %s", ival,

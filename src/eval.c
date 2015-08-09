@@ -37,13 +37,28 @@ static LLVMExecutionEngineRef eval_exec_engine_for(tree_t decl)
    static LLVMExecutionEngineRef exec_engine = NULL;
 
    if (exec_engine == NULL) {
-      LLVMLinkInInterpreter();
-
       LLVMModuleRef dummy = LLVMModuleCreateWithName("dummy");
 
+      LLVMInitializeNativeTarget();
+#ifdef LLVM_HAS_MCJIT
+      LLVMInitializeNativeAsmPrinter();
+      LLVMLinkInMCJIT();
+
+      struct LLVMMCJITCompilerOptions options;
+      LLVMInitializeMCJITCompilerOptions(&options, sizeof(options));
+
       char *error;
-      if (LLVMCreateInterpreterForModule(&exec_engine, dummy, &error))
-         fatal("error creating LLVM interpreter: %s", error);
+      if (LLVMCreateMCJITCompilerForModule(&exec_engine, dummy, &options,
+                                           sizeof(options), &error))
+         fatal("error creating MCJIT compiler: %s", error);
+#else
+      LLVMInitializeNativeTarget();
+      LLVMLinkInJIT();
+
+      char *error;
+      if (LLVMCreateExecutionEngineForModule(&exec_engine, dummy, &error))
+         fatal("error creating execution engine: %s", error);
+#endif
    }
 
    if (tree_attr_str(decl, builtin_i) != NULL)
@@ -53,6 +68,7 @@ static LLVMExecutionEngineRef eval_exec_engine_for(tree_t decl)
    printf("eval_llvm_func_for %s\n", istr(name));
 
    ident_t mangled = tree_attr_str(decl, mangled_i);
+   printf(" --> %s mangled=%p\n", tree_kind_str(tree_kind(decl)), mangled);
    if (mangled == NULL)
       return NULL;
 

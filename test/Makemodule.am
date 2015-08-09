@@ -16,8 +16,8 @@ check_PROGRAMS += $(UNIT_TESTS)
 
 check_LIBRARIES += test/libtest_util.a
 
-test_libs = test/libtest_util.a lib/libnvc.a lib/librt.a lib/libfastlz.a \
-	$(CHECK_LIBS) $(POW_LIB)
+test_libs = test/libtest_util.a lib/libnvc.a lib/libfastlz.a \
+	$(CHECK_LIBS) $(POW_LIB) $(LLVM_LIBS)
 
 test_libtest_util_a_SOURCES = test/test_util.c
 
@@ -40,7 +40,7 @@ bin_test_elab_SOURCES = test/test_elab.c
 bin_test_elab_LDADD = $(test_libs)
 
 bin_test_heap_SOURCES = test/test_heap.c
-bin_test_heap_LDADD =  lib/librt.a $(test_libs)
+bin_test_heap_LDADD = $(test_libs)
 
 bin_test_hash_SOURCES = test/test_hash.c
 bin_test_hash_LDADD = $(test_libs)
