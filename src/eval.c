@@ -36,6 +36,9 @@ static LLVMExecutionEngineRef eval_exec_engine_for(tree_t decl)
 {
    static LLVMExecutionEngineRef exec_engine = NULL;
 
+   if (tree_attr_int(decl, impure_i, 0))
+      return NULL;
+
    if (exec_engine == NULL) {
       LLVMModuleRef dummy = LLVMModuleCreateWithName("dummy");
 
